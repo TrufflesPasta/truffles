@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台大個人股份制學術爭霸 - 完整線上版</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1e1e24;
+            --text-main: #ffffff;
+            --accent: #ffca28;
+            --success: #4caf50;
+            --error: #f44336;
+        }
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header { text-align: center; margin-bottom: 20px; }
+        h1 { color: var(--accent); margin-bottom: 5px; }
+        
+        .login-box {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+        input, button {
+            padding: 10px 15px;
+            font-size: 14px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            margin: 5px;
+        }
+        input { background: #2a2a35; color: #fff; }
+        button { background: var(--accent); color: #000; font-weight: bold; cursor: pointer; }
+        button:hover { background: #ffe082; }
+
+        .game-layout { display: none; gap: 25px; max-width: 1100px; width: 100%; flex-wrap: wrap; justify-content: center; }
+        .map-section { flex: 1.2; min-width: 350px; background: #1a1a22; border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
+        .section-title { font-size: 18px; color: var(--accent); border-left: 4px solid var(--accent); padding-left: 10px; margin: 0 0 10px 0; }
+        
+        .building-card { background: var(--card-bg); border-radius: 12px; padding: 15px; cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent; }
+        .building-card:hover { transform: translateY(-3px); }
+        .building-card.active { border-color: var(--accent); background: #252532; }
+        .building-header { display: flex; justify-content: space-between; align-items: center; }
+        .building-name { font-size: 18px; font-weight: bold; }
+        .building-subject { font-size: 12px; background: #3a3a4a; padding: 2px 8px; border-radius: 10px; color: #ccc; }
+        .owner-info { margin-top: 10px; font-size: 14px; color: #b0b0b5; }
+        .owner-name { color: #4fc3f7; font-weight: bold; }
+        .owner-motto { font-style: italic; color: #888; font-size: 13px; margin-top: 3px; }
+
+        .action-section { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 20px; }
+        .panel { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        .leaderboard-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .leaderboard-item { display: flex; justify-content: space-between; background: #15151c; padding: 8px 12px; border-radius: 6px; font-size: 14px; }
+        .my-rank { border: 1px solid var(--success); }
+
+        .quiz-box { display: none; }
+        .quiz-question { font-size: 16px; font-weight: bold; margin-bottom: 15px; line-height: 1.5; }
+        .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+        .option-btn { background: #2a2a35; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 14px; }
+        .option-btn:hover { background: #3a3a4a; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>台大個人股份制學術爭霸 (連線版)</h1>
+        <div id="user-display" style="display:none; margin-top:10px;">
+            當前投資人：<span style="color:#4fc3f7;" id="player-tag"></span>
+        </div>
+    </header>
+
+    <div class="login-box" id="login-panel">
+        <h3>請輸入你的台大暱稱與學號登入</h3>
+        <input type="text" id="username-input" placeholder="例如：法律四/陳同學" style="width: 250px;"><br>
+        <button onclick="login()">進入校園戰場</button>
+    </div>
+
+    <div class="game-layout" id="game-panel">
+        <div class="map-section">
+            <div class="section-title">台大實體校園地圖</div>
+            <div id="map-buildings"></div>
+        </div>
+
+        <div class="action-section">
+            <div class="panel">
+                <div class="section-title">大樓即時股東會</div>
+                <div id="board-placeholder">請先在左側選擇一棟台大建築物。</div>
+                <div id="board-content" style="display:none;">
+                    <h3 id="selected-building-name" style="margin:0 0 5px 0; color:var(--accent);"></h3>
+                    <div class="leaderboard-list" id="leaderboard"></div>
+                </div>
+            </div>
+
+            <div class="panel quiz-box" id="quiz-panel">
+                <div class="section-title">學術刷題（答對獲得 10 股）</div>
+                <div class="quiz-question" id="quiz-q">題目加載中...</div>
+                <div class="quiz-options" id="quiz-opts"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🌟 這裡已經完美融入你剛剛給我的 truffles 專案金鑰配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfzefuYJQ5UtlG9VKWZf5wk05Yz9Zgu1A",
+            authDomain: "truffles-65b52.firebaseapp.com",
+            databaseURL: "https://truffles-65b52-default-rtdb.firebaseio.com", // 自動綁定你的 Realtime Database
+            projectId: "truffles-65b52",
+            storageBucket: "truffles-65b52.firebasestorage.app",
+            messagingSenderId: "608801836321",
+            appId: "1:608801836321:web:b34590cd51a7812a938260",
+            measurementId: "G-ZKKNR8EZKS"
+        };
+        
+        // 初始化 Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 題庫資料
+        const questionBank = {
+            'lib': [{ q: "Choose the correct word: The company's profits have _____ exceeded expectations.", o: ["significantly", "significant", "signify", "significance"], a: 0 }],
+            'boya': [{ q: "下列何者屬於邏輯謬誤中的「訴諸權威」？", o: ["因為大家都這麼說", "因為某名人說這話所以絕對對", "因為提不出證據", "以上皆非"], a: 1 }],
+            'cs': [{ q: "執行 `10 % 3` 的結果是什麼？", o: ["3", "3.33", "1", "0"], a: 2 }],
+            'fubell': [{ q: "台大傅鐘每次響起時，一共會敲幾下？", o: ["20下", "21下", "12下", "24下"], a: 1 }]
+        };
+
+        const defaultBuildings = {
+            'lib': { name: '台大總圖書館', subject: '多益通用英文', king: '系統管理員', kingShares: 10, kingMotto: '歡迎來到台大！' },
+            'boya': { name: '博雅教學館', subject: '核心通識思維', king: '系統管理員', kingShares: 10, kingMotto: '博雅冷氣讚。' },
+            'cs': { name: '資工系館', subject: '程式基礎與邏輯', king: '系統管理員', kingShares: 10, kingMotto: 'Hello World!' },
+            'fubell': { name: '傅鐘', subject: '台大歷史常識', king: '系統管理員', kingShares: 10, kingMotto: '傅鐘二一傳說。' }
+        };
+
+        let myPlayerName = "";
+        let currentBuildingId = null;
+
+        function login() {
+            const input = document.getElementById('username-input').value.trim();
+            if (!input) { alert("請輸入暱稱！"); return; }
+            myPlayerName = input;
+
+            document.getElementById('login-panel').style.display = 'none';
+            document.getElementById('game-panel').style.display = 'flex';
+            document.getElementById('user-display').style.display = 'block';
+            document.getElementById('player-tag').innerText = myPlayerName;
+
+            initGameSync();
+        }
+
+        function initGameSync() {
+            database.ref('buildings').on('value', (snapshot) => {
+                let data = snapshot.val();
+                if (!data) {
+                    database.ref('buildings').set(defaultBuildings);
+                    return;
+                }
+                renderMap(data);
+                if (currentBuildingId) {
+                    renderLeaderboard(data[currentBuildingId]);
+                }
+            });
+        }
+
+        function renderMap(data) {
+            const container = document.getElementById('map-buildings');
+            container.innerHTML = '';
+            
+            Object.keys(data).forEach(id => {
+                const b = data[id];
+                const card = document.createElement('div');
+                card.className = `building-card ${currentBuildingId === id ? 'active' : ''}`;
+                card.onclick = () => selectBuilding(id);
+
+                card.innerHTML = `
+                    <div class="building-header">
+                        <div class="building-name">${b.name}</div>
+                        <div class="building-subject">${b.subject}</div>
+                    </div>
+                    <div class="owner-info">
+                        👑 最高持股領主：<span class="owner-name">${b.king}</span> (${b.kingShares} 股)
+                        <div class="owner-motto">「${b.kingMotto}」</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function selectBuilding(id) {
+            currentBuildingId = id;
+            database.ref('buildings').once('value', (snapshot) => {
+                const data = snapshot.val();
+                renderMap(data);
+                renderLeaderboard(data[id]);
+                document.getElementById('board-placeholder').style.display = 'none';
+                document.getElementById('board-content').style.display = 'block';
+                document.getElementById('selected-building-name').innerText = data[id].name;
+                document.getElementById('quiz-panel').style.display = 'block';
+                loadNewQuestion();
+            });
+        }
+
+        function renderLeaderboard(building) {
+            const listContainer = document.getElementById('leaderboard');
+            listContainer.innerHTML = '';
+
+            const playerShares = building.playerShares || {};
+            if (!playerShares[myPlayerName]) playerShares[myPlayerName] = 0;
+
+            const sortedPlayers = Object.keys(playerShares).sort((a,b) => playerShares[b] - playerShares[a]);
+            
+            sortedPlayers.forEach((player, index) => {
+                const item = document.createElement('div');
+                item.className = `leaderboard-item ${player === myName ? 'my-rank' : ''}`;
+                item.innerHTML = `<span>第 ${index + 1} 名 - ${player}</span><strong>${playerShares[player]} 股</strong>`;
+                listContainer.appendChild(item);
+            });
+        }
+
+        let currentAnswer = null;
+        function loadNewQuestion() {
+            const questions = questionBank[currentBuildingId];
+            const randomQuiz = questions[Math.floor(Math.random() * questions.length)];
+            document.getElementById('quiz-q').innerText = randomQuiz.q;
+            const optsContainer = document.getElementById('quiz-opts');
+            optsContainer.innerHTML = '';
+            currentAnswer = randomQuiz.a;
+
+            randomQuiz.o.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = `${idx + 1}. ${opt}`;
+                btn.onclick = () => checkAnswer(idx);
+                optsContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(userChoice) {
+            if (userChoice !== currentAnswer) {
+                alert("❌ 答錯了！再接再厲！");
+                loadNewQuestion();
+                return;
+            }
+
+            alert("🎉 答對了！寫入雲端股份中...");
+
+            database.ref(`buildings/${currentBuildingId}`).once('value', (snapshot) => {
+                let b = snapshot.val();
+                if (!b.playerShares) b.playerShares = {};
+                if (!b.playerShares[myPlayerName]) b.playerShares[myPlayerName] = 0;
+
+                b.playerShares[myPlayerName] += 10;
+
+                const sorted = Object.keys(b.playerShares).sort((a,b) => b.playerShares[b] - b.playerShares[a]);
+                const currentLeader = sorted[0];
+
+                if (currentLeader === myPlayerName && b.king !== myPlayerName) {
+                    alert("🏆 奇蹟發生！你超越了原本的領主，成功篡位！");
+                    const motto = prompt("請輸入你掛在台大地圖上的領主座右銘：") || "全校我最強！";
+                    b.king = myPlayerName;
+                    b.kingShares = b.playerShares[myPlayerName];
+                    b.kingMotto = motto;
+                } else if (b.king === myPlayerName) {
+                    b.kingShares = b.playerShares[myPlayerName];
+                }
+
+                database.ref(`buildings/${currentBuildingId}`).set(b).then(() => {
+                    loadNewQuestion();
+                });
+            });
+        }
+    </script>
+</body>
+</html>
