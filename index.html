@@ -224,7 +224,7 @@
             
             sortedPlayers.forEach((player, index) => {
                 const item = document.createElement('div');
-                item.className = `leaderboard-item ${player === myName ? 'my-rank' : ''}`;
+                item.className = `leaderboard-item ${player === myPlayerName ? 'my-rank' : ''}`;
                 item.innerHTML = `<span>第 ${index + 1} 名 - ${player}</span><strong>${playerShares[player]} 股</strong>`;
                 listContainer.appendChild(item);
             });
