@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台大個人股份制學術爭霸 - 完整線上版</title>
+    <title>台大個人股份制學術爭霸 - 實體地圖連線版</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         :root {
             --bg-color: #121214;
@@ -37,48 +41,44 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             margin-bottom: 20px;
         }
-        input, button {
-            padding: 10px 15px;
-            font-size: 14px;
-            border-radius: 6px;
-            border: 1px solid #444;
-            margin: 5px;
-        }
-        input { background: #2a2a35; color: #fff; }
-        button { background: var(--accent); color: #000; font-weight: bold; cursor: pointer; }
+        button { background: var(--accent); color: #000; font-weight: bold; cursor: pointer; padding: 10px 15px; font-size: 14px; border-radius: 6px; border: 1px solid #444; margin: 5px; }
         button:hover { background: #ffe082; }
 
         .game-layout { display: none; gap: 25px; max-width: 1100px; width: 100%; flex-wrap: wrap; justify-content: center; }
+        
+        /* 地圖區塊樣式 */
         .map-section { flex: 1.2; min-width: 350px; background: #1a1a22; border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
         .section-title { font-size: 18px; color: var(--accent); border-left: 4px solid var(--accent); padding-left: 10px; margin: 0 0 10px 0; }
         
-        .building-card { background: var(--card-bg); border-radius: 12px; padding: 15px; cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent; }
-        .building-card:hover { transform: translateY(-3px); }
-        .building-card.active { border-color: var(--accent); background: #252532; }
-        .building-header { display: flex; justify-content: space-between; align-items: center; }
-        .building-name { font-size: 18px; font-weight: bold; }
-        .building-subject { font-size: 12px; background: #3a3a4a; padding: 2px 8px; border-radius: 10px; color: #ccc; }
-        .owner-info { margin-top: 10px; font-size: 14px; color: #b0b0b5; }
-        .owner-name { color: #4fc3f7; font-weight: bold; }
-        .owner-motto { font-style: italic; color: #888; font-size: 13px; margin-top: 3px; }
+        #ntu-real-map {
+            width: 100%;
+            height: 500px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 1;
+        }
 
         .action-section { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 20px; }
         .panel { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
         .leaderboard-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
         .leaderboard-item { display: flex; justify-content: space-between; background: #15151c; padding: 8px 12px; border-radius: 6px; font-size: 14px; }
-        .my-rank { border: 1px solid var(--success); }
+        .my-rank { border: 1px solid var(--success); background: #1b3a24; }
 
         .quiz-box { display: none; }
         .quiz-question { font-size: 16px; font-weight: bold; margin-bottom: 15px; line-height: 1.5; }
         .quiz-options { display: flex; flex-direction: column; gap: 10px; }
-        .option-btn { background: #2a2a35; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 14px; }
-        .option-btn:hover { background: #3a3a4a; }
+        .option-btn { background: #2a2a35; color: #fff; border: 1px solid #444; padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 14px; width: 100%; }
+        .option-btn:hover { background: #3a3a4a; border-color: var(--accent); }
+
+        /* Leaflet 彈窗深色風格自訂 */
+        .leaflet-popup-content-wrapper { background: #1e1e24 !important; color: #fff !important; border-radius: 8px; }
+        .leaflet-popup-tip { background: #1e1e24 !important; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>台大個人股份制學術爭霸 (連線版)</h1>
+        <h1>台大個人股份制學術爭霸 (地圖連線版)</h1>
         <div id="user-display" style="display:none; margin-top:10px;">
             當前投資人：<span style="color:#4fc3f7;" id="player-tag"></span>
         </div>
@@ -91,14 +91,14 @@
 
     <div class="game-layout" id="game-panel">
         <div class="map-section">
-            <div class="section-title">台大實體校園地圖</div>
-            <div id="map-buildings"></div>
+            <div class="section-title">🗺️ 拖曳與放大地圖，點擊校園地標進行投資</div>
+            <div id="ntu-real-map"></div>
         </div>
 
         <div class="action-section">
             <div class="panel">
                 <div class="section-title">大樓即時股東會</div>
-                <div id="board-placeholder">請先在左側選擇一棟台大建築物。</div>
+                <div id="board-placeholder">請先在左側地圖上點擊一棟台大建築物。</div>
                 <div id="board-content" style="display:none;">
                     <h3 id="selected-building-name" style="margin:0 0 5px 0; color:var(--accent);"></h3>
                     <div class="leaderboard-list" id="leaderboard"></div>
@@ -114,11 +114,11 @@
     </div>
 
     <script>
-        // 🌟 這裡已經完美融入你剛剛給我的 truffles 專案金鑰配置
+        // Firebase 專案配置
         const firebaseConfig = {
             apiKey: "AIzaSyCfzefuYJQ5UtlG9VKWZf5wk05Yz9Zgu1A",
             authDomain: "truffles-65b52.firebaseapp.com",
-            databaseURL: "https://truffles-65b52-default-rtdb.asia-southeast1.firebasedatabase.app", // 自動綁定你的 Realtime Database
+            databaseURL: "https://truffles-65b52-default-rtdb.asia-southeast1.firebasedatabase.app", 
             projectId: "truffles-65b52",
             storageBucket: "truffles-65b52.firebasestorage.app",
             messagingSenderId: "608801836321",
@@ -130,55 +130,85 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // 題庫資料
+        // 擴充版題庫資料
         const questionBank = {
             'lib': [{ q: "Choose the correct word: The company's profits have _____ exceeded expectations.", o: ["significantly", "significant", "signify", "significance"], a: 0 }],
             'boya': [{ q: "下列何者屬於邏輯謬誤中的「訴諸權威」？", o: ["因為大家都這麼說", "因為某名人說這話所以絕對對", "因為提不出證據", "以上皆非"], a: 1 }],
             'cs': [{ q: "執行 `10 % 3` 的結果是什麼？", o: ["3", "3.33", "1", "0"], a: 2 }],
-            'fubell': [{ q: "台大傅鐘每次響起時，一共會敲幾下？", o: ["20下", "21下", "12下", "24下"], a: 1 }]
+            'fubell': [{ q: "台大傅鐘每次響起時，一共會敲幾下？", o: ["20下", "21下", "12下", "24下"], a: 1 }],
+            'social': [{ q: "經濟學中著名的「看不見的手」概念，是由哪位學者提出的？", o: ["亞當斯密", "凱因斯", "馬克思", "馬歇爾"], a: 0 }]
         };
 
+        // 包含 GPS 經緯度座標的預設大樓設定
         const defaultBuildings = {
-            'lib': { name: '台大總圖書館', subject: '多益通用英文', king: '系統管理員', kingShares: 10, kingMotto: '歡迎來到台大！' },
-            'boya': { name: '博雅教學館', subject: '核心通識思維', king: '系統管理員', kingShares: 10, kingMotto: '博雅冷氣讚。' },
-            'cs': { name: '資工系館', subject: '程式基礎與邏輯', king: '系統管理員', kingShares: 10, kingMotto: 'Hello World!' },
-            'fubell': { name: '傅鐘', subject: '台大歷史常識', king: '系統管理員', kingShares: 10, kingMotto: '傅鐘二一傳說。' }
+            'lib': { name: '台大總圖書館', lat: 25.01742, lng: 121.54055, subject: '多益通用英文', king: '系統管理員', kingShares: 10, kingMotto: '歡迎來到台大！' },
+            'boya': { name: '博雅教學館', lat: 25.01918, lng: 121.53637, subject: '核心通識思維', king: '系統管理員', kingShares: 10, kingMotto: '博雅冷氣讚。' },
+            'cs': { name: '資工系館', lat: 25.01957, lng: 121.54228, subject: '程式基礎與邏輯', king: '系統管理員', kingShares: 10, kingMotto: 'Hello World!' },
+            'fubell': { name: '傅鐘', lat: 25.01755, lng: 121.53775, subject: '台大歷史常識', king: '系統管理員', kingShares: 10, kingMotto: '傅鐘二一傳說。' },
+            'social': { name: '社會科學院', lat: 25.02081, lng: 121.54222, subject: '政治與經濟學', king: '系統管理員', kingShares: 10, kingMotto: '辛亥路側明亮新棟。' }
         };
 
         let myPlayerName = "";
         let currentBuildingId = null;
+        let mapInstance = null; // 存放地圖本體
+        let mapMarkers = {};   // 存放地圖大頭針標記
 
         function login() {
-        // 建立 Google 登入的供應商物件
-        const provider = new firebase.auth.GoogleAuthProvider();
-    
-        // 觸發 Google 彈出視窗
-        firebase.auth().signInWithPopup(provider)
-        .then((result) => {
-            // 登入成功！抓取使用者的 Google 顯示名稱與不重複的 UID
-            const user = result.user;
+            const provider = new firebase.auth.GoogleAuthProvider();
         
-            // 🌟 關鍵修正：這裡改用使用者的 E-mail（把點和斜線換掉）或 UID 作為唯一的記帳 Key
-            // 這樣就算有兩個「陳同學」，他們的 Google 帳號不同，就不會互相覆蓋！
-            myPlayerName = user.displayName; 
-        
-            // 為了防止 Firebase 記帳本因為 Google 名字裡有句點 . 或斜線而報錯，我們過濾一下
-            myPlayerName = myPlayerName.replace(/[\.\#\$\/\[\]]/g, "_");
+            firebase.auth().signInWithPopup(provider)
+            .then((result) => {
+                const user = result.user;
+                myPlayerName = user.displayName; 
+                
+                // 過濾不合法字元避免 Firebase 路徑報錯
+                myPlayerName = myPlayerName.replace(/[\.\#\$\/\[\]]/g, "_");
 
-            // 畫面切換
-            document.getElementById('login-panel').style.display = 'none';
-            document.getElementById('game-panel').style.display = 'flex';
-            document.getElementById('user-display').style.display = 'block';
-            document.getElementById('player-tag').innerText = `${user.displayName} (${user.email})`;
+                // 畫面切換
+                document.getElementById('login-panel').style.display = 'none';
+                document.getElementById('game-panel').style.display = 'flex';
+                document.getElementById('user-display').style.display = 'block';
+                document.getElementById('player-tag').innerText = `${user.displayName} (${user.email})`;
 
-            // 啟動遊戲資料庫同步
-            initGameSync();
-        })
-        .catch((error) => {
-            console.error("登入失敗：", error);
-            alert("Google 登入失敗或取消，請重試！" + error.message);
-        });
-    }
+                // 依序初始化地圖與同步資料庫
+                initRealMap();
+                initGameSync();
+            })
+            .catch((error) => {
+                console.error("登入失敗：", error);
+                alert("Google 登入失敗或取消，請重試！");
+            });
+        }
+
+        // 初始化 Leaflet 真實地圖
+        function initRealMap() {
+            if (mapInstance) return;
+
+            // 將中心設在傅鐘與總圖之間的中心點，預設放大 16 倍，確保能看到所有系館
+            mapInstance = L.map('ntu-real-map').setView([25.0185, 121.5395], 16);
+
+            // 載入 OpenStreetMap 高質感科技感暗色地圖磚
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            }).addTo(mapInstance);
+
+            // 在地圖上安插大頭針
+            Object.keys(defaultBuildings).forEach(id => {
+                const b = defaultBuildings[id];
+                const marker = L.marker([b.lat, b.lng]).addTo(mapInstance);
+                
+                // 滑鼠移過去時顯示文字提示
+                marker.bindTooltip(`<b>${b.name}</b>`, { permanent: true, direction: 'top', className: 'my-tooltip' });
+                
+                // 點擊大頭針時，觸發選擇大樓
+                marker.on('click', () => {
+                    selectBuilding(id);
+                });
+
+                // 將標記物件存入全域陣列，方便後續動態更新 Popup 內容
+                mapMarkers[id] = marker;
+            });
+        }
 
         function initGameSync() {
             database.ref('buildings').on('value', (snapshot) => {
@@ -187,34 +217,25 @@
                     database.ref('buildings').set(defaultBuildings);
                     return;
                 }
-                renderMap(data);
+                
+                // 🌟 當資料庫數據變動時，即時更新地圖標記上的領主資訊氣泡
+                Object.keys(data).forEach(id => {
+                    const b = data[id];
+                    if (mapMarkers[id]) {
+                        mapMarkers[id].bindPopup(`
+                            <div style="font-size:14px; line-height:1.4;">
+                                <b style="color:#ffca28; font-size:15px;">${b.name}</b><br>
+                                👑 領主：<b>${b.king}</b> (${b.kingShares} 股)<br>
+                                <i style="color:#aaa;">「${b.kingMotto}」</i><br>
+                                <span style="color:#4fc3f7; font-size:12px; display:block; margin-top:5px;">👉 點擊右側考題可開始投資</span>
+                            </div>
+                        `);
+                    }
+                });
+
                 if (currentBuildingId) {
                     renderLeaderboard(data[currentBuildingId]);
                 }
-            });
-        }
-
-        function renderMap(data) {
-            const container = document.getElementById('map-buildings');
-            container.innerHTML = '';
-            
-            Object.keys(data).forEach(id => {
-                const b = data[id];
-                const card = document.createElement('div');
-                card.className = `building-card ${currentBuildingId === id ? 'active' : ''}`;
-                card.onclick = () => selectBuilding(id);
-
-                card.innerHTML = `
-                    <div class="building-header">
-                        <div class="building-name">${b.name}</div>
-                        <div class="building-subject">${b.subject}</div>
-                    </div>
-                    <div class="owner-info">
-                        👑 最高持股領主：<span class="owner-name">${b.king}</span> (${b.kingShares} 股)
-                        <div class="owner-motto">「${b.kingMotto}」</div>
-                    </div>
-                `;
-                container.appendChild(card);
             });
         }
 
@@ -222,12 +243,15 @@
             currentBuildingId = id;
             database.ref('buildings').once('value', (snapshot) => {
                 const data = snapshot.val();
-                renderMap(data);
                 renderLeaderboard(data[id]);
+                
                 document.getElementById('board-placeholder').style.display = 'none';
                 document.getElementById('board-content').style.display = 'block';
-                document.getElementById('selected-building-name').innerText = data[id].name;
+                document.getElementById('selected-building-name').innerText = `${data[id].name} (${data[id].subject})`;
                 document.getElementById('quiz-panel').style.display = 'block';
+                
+                // 每次切換大樓，連帶開啟氣泡，並載入新題目
+                if(mapMarkers[id]) mapMarkers[id].openPopup();
                 loadNewQuestion();
             });
         }
@@ -287,7 +311,7 @@
                 const currentLeader = sorted[0];
 
                 if (currentLeader === myPlayerName && b.king !== myPlayerName) {
-                    alert("🏆 奇蹟發生！你超越了原本的領主，成功篡位！");
+                    alert("🏆 篡位成功！你成為了此處的最高股權領主！");
                     const motto = prompt("請輸入你掛在台大地圖上的領主座右銘：") || "全校我最強！";
                     b.king = myPlayerName;
                     b.kingShares = b.playerShares[myPlayerName];
@@ -296,6 +320,7 @@
                     b.kingShares = b.playerShares[myPlayerName];
                 }
 
+                // 使用安全的一鍵覆蓋 set 確保數據完全寫入 Firebase Realtime Database
                 database.ref(`buildings/${currentBuildingId}`).set(b).then(() => {
                     loadNewQuestion();
                 });
