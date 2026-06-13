@@ -6,6 +6,7 @@
     <title>台大個人股份制學術爭霸 - 完整線上版</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <style>
         :root {
             --bg-color: #121214;
@@ -84,9 +85,8 @@
     </header>
 
     <div class="login-box" id="login-panel">
-        <h3>請輸入你的台大暱稱與學號登入</h3>
-        <input type="text" id="username-input" placeholder="例如：法律四/陳同學" style="width: 250px;"><br>
-        <button onclick="login()">進入校園戰場</button>
+        <h3>歡迎來到臺大股份制學術爭霸</h3>
+        <button onclick="login()" style="background: #4285F4; color: white; padding: 12px 25px;"> 使用 Google 帳號登入</button>
     </div>
 
     <div class="game-layout" id="game-panel">
@@ -149,17 +149,36 @@
         let currentBuildingId = null;
 
         function login() {
-            const input = document.getElementById('username-input').value.trim();
-            if (!input) { alert("請輸入暱稱！"); return; }
-            myPlayerName = input;
+        // 建立 Google 登入的供應商物件
+        const provider = new firebase.auth.GoogleAuthProvider();
+    
+        // 觸發 Google 彈出視窗
+        firebase.auth().signInWithPopup(provider)
+        .then((result) => {
+            // 登入成功！抓取使用者的 Google 顯示名稱與不重複的 UID
+            const user = result.user;
+        
+            // 🌟 關鍵修正：這裡改用使用者的 E-mail（把點和斜線換掉）或 UID 作為唯一的記帳 Key
+            // 這樣就算有兩個「陳同學」，他們的 Google 帳號不同，就不會互相覆蓋！
+            myPlayerName = user.displayName; 
+        
+            // 為了防止 Firebase 記帳本因為 Google 名字裡有句點 . 或斜線而報錯，我們過濾一下
+            myPlayerName = myPlayerName.replace(/[\.\#\$\/\[\]]/g, "_");
 
+            // 畫面切換
             document.getElementById('login-panel').style.display = 'none';
             document.getElementById('game-panel').style.display = 'flex';
             document.getElementById('user-display').style.display = 'block';
-            document.getElementById('player-tag').innerText = myPlayerName;
+            document.getElementById('player-tag').innerText = `${user.displayName} (${user.email})`;
 
+            // 啟動遊戲資料庫同步
             initGameSync();
-        }
+        })
+        .catch((error) => {
+            console.error("登入失敗：", error);
+            alert("Google 登入失敗或取消，請重試！" + error.message);
+        });
+    }
 
         function initGameSync() {
             database.ref('buildings').on('value', (snapshot) => {
