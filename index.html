@@ -188,8 +188,8 @@
             mapInstance = L.map('ntu-real-map').setView([25.0185, 121.5395], 16);
 
             // 載入 OpenStreetMap 高質感科技感暗色地圖磚
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(mapInstance);
 
             // 在地圖上安插大頭針
