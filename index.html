@@ -323,6 +323,7 @@
                 // 使用安全的一鍵覆蓋 set 確保數據完全寫入 Firebase Realtime Database
                 database.ref(`buildings/${currentBuildingId}`).set(b).then(() => {
                     loadNewQuestion();
+                    selectBuilding(currentBuildingId);
                 });
             });
         }
